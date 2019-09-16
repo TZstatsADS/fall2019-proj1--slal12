@@ -45,9 +45,25 @@ load('../output/processed_lyrics.RData')
 dt_artist <- fread('../data/artists.csv') 
 ```
 
-```{r trigrams popularity in genre over time}
-genre_song_counts = dt_lyrics %>% count(genre, sort = TRUE)
+```{r songs per genre per year}
+#Find number of songs per genre in a given year
+genre_year_song_counts = dt_lyrics %>% group_by(genre,year) %>% mutate(genre_year_count = n()) %>% ungroup() %>% select(genre, year, genre_year_count) %>% unique() %>% filter(genre != "Other" & genre != "Not Available" & year >2003) 
 
+ggplot(data = genre_year_song_counts, 
+       mapping = aes(x = year, y = genre_year_count, color = genre)) +
+  geom_line() +
+  facet_grid(rows = vars(genre), scales = "free_y") +
+  xlab("Year") +
+  ylab(label="Number of Songs") +
+  ggtitle("Number of songs in each genre in a year") + 
+  theme_bw()
+
+
+
+```
+
+
+```{r trigrams popularity in genre over time}
 #Only care about trigram appearing once in a song
 lyric_trigrams <- dt_lyrics %>%
       unnest_tokens(trigram, stemmedwords, token = "ngrams", n = 3) %>% unique()
@@ -91,15 +107,19 @@ most_popular_trigram = trigram_genre_counts %>% inner_join(genre_top_percentile,
 
 #Find frequency that that trigram for songs in a genre appeared in each year
 trigram_over_time = most_popular_trigram %>% group_by(genre, trigram, year) %>% mutate(genre_popular_trigram_count_by_year = n()) %>% ungroup()
+
+trigram_over_time = trigram_over_time %>% left_join(genre_year_song_counts, by = c("genre" = "genre", "year" = "year")) %>% mutate(percent_of_songs_in = genre_popular_trigram_count_by_year/genre_year_count * 100)
+
 ```
 
 ``` {r make plot}
 #Create unique column for graph
 trigram_over_time$genre_w1_w2_w3 = paste(trigram_over_time$genre, trigram_over_time$trigram, sep="_")
 
+
 #Select columns for graph and remove ties
 trigram_genre_year_data = trigram_over_time %>% 
-  select(year, genre_popular_trigram_count_by_year, genre_w1_w2_w3, count) %>% 
+  select(year, percent_of_songs_in, genre_w1_w2_w3, count) %>% 
   unique() %>% 
   filter(
       genre_w1_w2_w3 != "Indie_time fall love" & 
@@ -110,11 +130,24 @@ trigram_genre_year_data = trigram_over_time %>%
 #To improve graph remove rows where data only shows up once
 trigram_genre_year_data = trigram_genre_year_data %>% filter(year > 2000)
 
+trigram_genre_year_data[is.na(trigram_genre_year_data)] <- 0
+
 ggplot(trigram_genre_year_data, aes(x=year, y=genre_popular_trigram_count_by_year, col=genre_w1_w2_w3)) + 
   geom_line() +
   ylab(label="Number of songs in") + 
   xlab("Year") + 
   ggtitle("Each Genre's most popular trigram appearances over Time")
+
+ggplot(data = trigram_genre_year_data, 
+       mapping = aes(x = year, y = percent_of_songs_in, color = genre_w1_w2_w3)) +
+  geom_line() +
+  facet_grid(rows = vars(genre_w1_w2_w3), scales = "free_y") +
+  xlab("Year") +
+  ylab(label="Percent of songs in") +
+  ggtitle("Each Genre's most popular trigram appearances over Time") + 
+  theme_bw()
+
+
 ```
 
 
@@ -141,9 +174,18 @@ average_genre_sentiment_over_time <- average_song_sentiment %>% group_by(genre,y
 
 ggplot(average_genre_sentiment_over_time, aes(x=year, y=average_genre_sentiment, col=genre)) + 
   geom_line() +
-  ylab(label="Sentiment") + 
+  ylab(label="Average Sentiment per Song") + 
   xlab("Year") + 
-  ggtitle("Each Genre's Average Sentiment over Time")
+  ggtitle("Genre Sentiment over Time")
+
+ggplot(data = average_genre_sentiment_over_time, 
+       mapping = aes(x = year, y = average_genre_sentiment, color = genre)) +
+  geom_line() +
+  facet_grid(rows = vars(genre)) +
+  xlab("Year") +
+  ylab(label="Average Sentiment per Song") +
+  ggtitle("Genre Sentiment over Time") + 
+  theme_bw()
 
 ```
 
