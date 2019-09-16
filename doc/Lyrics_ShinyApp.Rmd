@@ -201,22 +201,3 @@ server <- function(input, output) {
 ```{r shiny app, warning=FALSE, message=FALSE}
 shinyApp(ui, server)
 ```
-
-
-
-
-```{r}
-year_start = 2009
-dt_sub <- filter(dt_lyrics, year>=year_start) %>% filter(year<(year_start+10))
-lyric_trigrams <- dt_sub %>%
-      unnest_tokens(trigram, stemmedwords, token = "ngrams", n = 3)
-trigram_counts <- lyric_trigrams %>%
-      separate(trigram, c("word1", "word2", "word3"), sep = " ") %>%
-      count(word1, word2, word3, sort = TRUE)
-unique_trigrams = trigram_counts %>% 
-                    filter(word1 != word2 & word2 != word3 & word1 != word3)
-
-
-#Look into artist linked to trigram most frequently (questions about originality)
-```
-

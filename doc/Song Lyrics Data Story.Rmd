@@ -1,0 +1,151 @@
+---
+title: "Song Lyrics Data Story"
+author: "Sagar Lal"
+date: "9/14/2019"
+output: html_document
+---
+
+"lyrics_filter.csv" is a filtered corpus of 380,000+ song lyrics from from MetroLyrics. You can read more about it on [Kaggle](https://www.kaggle.com/gyani95/380000-lyrics-from-metrolyrics).
+
+"info_artist.csv" provides the background information of all the artistis. These information are scraped from [LyricsFreak](https://www.lyricsfreak.com/).
+
+Here, we explore these data sets and try to find interesting patterns.
+
+### Load all the required libraries
+
+```{r load libraries, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(tidytext)
+library(plotly)
+library(DT)
+library(tm)
+library(data.table)
+library(scales)
+library(wordcloud2)
+library(gridExtra)
+library(ngram)
+library(shiny) 
+library(ggplot2)
+```
+
+This notebook was prepared with the following environmental settings.
+
+```{r version}
+print(R.version)
+```
+
+### Load the processed lyrics data along with artist information
+
+We use the processed data and artist information for our analysis.
+
+```{r load data, warning=FALSE, message=FALSE}
+# load lyrics data
+load('../output/processed_lyrics.RData') 
+# load artist information
+dt_artist <- fread('../data/artists.csv') 
+```
+
+```{r trigrams popularity in genre over time}
+genre_song_counts = dt_lyrics %>% count(genre, sort = TRUE)
+
+#Only care about trigram appearing once in a song
+lyric_trigrams <- dt_lyrics %>%
+      unnest_tokens(trigram, stemmedwords, token = "ngrams", n = 3) %>% unique()
+
+#Need to seperate words so can determine that words aren't the same
+trigram_seperated <- lyric_trigrams %>%
+      separate(trigram, c("word1", "word2", "word3"), sep = " ", remove = FALSE)
+
+#Make sure trigrams don't have same word to avoid "baby baby baby", also remove case of each song written by babyface, also only care about phrase appearing once in a song (don't want 'i am blue' to repeatedly appear)
+unique_trigrams = trigram_seperated %>%
+                    filter(word1 != word2 & word2 != word3 & word1 != word3)
+
+#Find how many times each trigram appears in songs of a particular genre
+trigram_genre_counts = unique_trigrams %>% group_by(genre, trigram) %>% mutate(count = n()) %>% ungroup()
+
+#Filter out specific trigrams that aren't lyrics, as well as unknown and not avaialable genre
+trigram_genre_counts = trigram_genre_counts %>% filter(
+                            genre != "Not Available" &
+                            genre != "Other" &
+                            trigram != "written reid babyface" &
+                            trigram != "written babyface performed" &
+                            trigram != "chorus repeat x" &
+                            trigram != "daryl simmons performed" &
+                            trigram != "written billy burnette" &
+                            trigram != "babyface daryl simmons" &
+                            trigram != "dennis ufo music" &
+                            trigram != "sandy dennis ufo" &
+                            trigram != "reid babyface daryl" &
+                            trigram != "performed tony braxton" &
+                            trigram != "music vestergaard lyrics"&
+                            trigram != "vestergaard lyrics frolund" &
+                            trigram != "written babyface reid" &
+                            trigram != "performed whitney houston")
+
+
+#Find most frequent appearing trigram in each genre and the number of times
+genre_top_percentile = trigram_genre_counts %>% group_by(genre) %>% summarise(most_popular = quantile(count, probs = 1))
+
+#Rejoin so only keep songs that contain most popular trigram in that song's genre
+most_popular_trigram = trigram_genre_counts %>% inner_join(genre_top_percentile, by = c("genre" = "genre", "count" = "most_popular"))
+
+#Find frequency that that trigram for songs in a genre appeared in each year
+trigram_over_time = most_popular_trigram %>% group_by(genre, trigram, year) %>% mutate(genre_popular_trigram_count_by_year = n()) %>% ungroup()
+```
+
+``` {r make plot}
+#Create unique column for graph
+trigram_over_time$genre_w1_w2_w3 = paste(trigram_over_time$genre, trigram_over_time$trigram, sep="_")
+
+#Select columns for graph and remove ties
+trigram_genre_year_data = trigram_over_time %>% 
+  select(year, genre_popular_trigram_count_by_year, genre_w1_w2_w3, count) %>% 
+  unique() %>% 
+  filter(
+      genre_w1_w2_w3 != "Indie_time fall love" & 
+      genre_w1_w2_w3 != "Jazz_sing love song" & 
+      genre_w1_w2_w3 != "Metal_blaze ya dead" & 
+      genre_w1_w2_w3 != "R&B_love rest life")
+
+#To improve graph remove rows where data only shows up once
+trigram_genre_year_data = trigram_genre_year_data %>% filter(year > 2000)
+
+ggplot(trigram_genre_year_data, aes(x=year, y=genre_popular_trigram_count_by_year, col=genre_w1_w2_w3)) + 
+  geom_line() +
+  ylab(label="Number of songs in") + 
+  xlab("Year") + 
+  ggtitle("Each Genre's most popular trigram appearances over Time")
+```
+
+
+
+``` {r Genre change in sentiment over time}
+unnested_lyrics <- dt_lyrics %>%
+      unnest_tokens(word, lyrics)
+
+new_sentiments <- sentiments %>% 
+  mutate( sentiment = ifelse(sentiment == "positive", 1, ifelse(sentiment == "negative", -1, 0))) 
+
+song_sentiment <- unnested_lyrics %>% left_join(new_sentiments, by = c("word" = "word"))
+
+song_sentiment[is.na(song_sentiment)] <- 0
+
+
+average_song_sentiment <- song_sentiment %>%
+  group_by(song,genre,artist,year) %>% summarize(total_song_sentiment = sum(sentiment), song_lyric_words = n()) %>%   mutate(average_song_sentiment = total_song_sentiment/song_lyric_words) %>% ungroup()
+
+average_genre_sentiment_over_time <- average_song_sentiment %>% group_by(genre,year) %>% summarize(total_genre_sentiment = sum(average_song_sentiment), total_genre_songs = n()) %>%
+  mutate(average_genre_sentiment = total_genre_sentiment/total_genre_songs) %>% ungroup() %>% filter(year>1999 & genre != "Other" & genre != "Not Available")
+
+
+
+ggplot(average_genre_sentiment_over_time, aes(x=year, y=average_genre_sentiment, col=genre)) + 
+  geom_line() +
+  ylab(label="Sentiment") + 
+  xlab("Year") + 
+  ggtitle("Each Genre's Average Sentiment over Time")
+
+```
+
+
+
