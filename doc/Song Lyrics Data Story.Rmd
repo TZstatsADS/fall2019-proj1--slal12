@@ -2,7 +2,9 @@
 title: "Song Lyrics Data Story"
 author: "Sagar Lal"
 date: "9/14/2019"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 "lyrics_filter.csv" is a filtered corpus of 380,000+ song lyrics from from MetroLyrics. You can read more about it on [Kaggle](https://www.kaggle.com/gyani95/380000-lyrics-from-metrolyrics).
@@ -11,9 +13,7 @@ output: html_document
 
 Here, we explore these data sets and try to find interesting patterns.
 
-### Load all the required libraries
-
-```{r load libraries, warning=FALSE, message=FALSE}
+```{r load libraries, warning=FALSE, message=FALSE, echo=FALSE}
 library(tidyverse)
 library(tidytext)
 library(plotly)
@@ -26,26 +26,32 @@ library(gridExtra)
 library(ngram)
 library(shiny) 
 library(ggplot2)
+library(ggridges)
 ```
 
-This notebook was prepared with the following environmental settings.
 
-```{r version}
+#### This notebook was prepared with the following environmental settings.
+
+```{r version, echo=FALSE}
+#This notebook was prepared with the following environmental settings.
 print(R.version)
 ```
 
-### Load the processed lyrics data along with artist information
+```{r load data, warning=FALSE, message=FALSE, echo=FALSE}
+#We use the processed data and artist information for our analysis.
 
-We use the processed data and artist information for our analysis.
-
-```{r load data, warning=FALSE, message=FALSE}
 # load lyrics data
 load('../output/processed_lyrics.RData') 
 # load artist information
 dt_artist <- fread('../data/artists.csv') 
 ```
 
-```{r songs per genre per year}
+# **Goal: Explore how genre's change over time in our dataset.**
+
+
+#### Each genre's song output
+
+```{r songs per genre per year, echo=FALSE}
 #Find number of songs per genre in a given year
 genre_year_song_counts = dt_lyrics %>% group_by(genre,year) %>% mutate(genre_year_count = n()) %>% ungroup() %>% select(genre, year, genre_year_count) %>% unique() %>% filter(genre != "Other" & genre != "Not Available" & year >2003) 
 
@@ -57,13 +63,15 @@ ggplot(data = genre_year_song_counts,
   ylab(label="Number of Songs") +
   ggtitle("Number of songs in each genre in a year") + 
   theme_bw()
-
-
-
 ```
 
+Most genre's appear to have their maximal output of songs in 2006 with rock achieveing a peak output of 25k songs. A few genre's have a peak output in 2007. This includes country, indie, and metal. It is notable that almost all genres produce significantly more songs between 2005-2008 before receding to consistently fewer songs, suggesting the dataset aggregated music from a specific time. Note the y-axis is different across plots, due to certain genres such as Indie and R&B producing significantly less music. 
 
-```{r trigrams popularity in genre over time}
+
+#### How pervasive are lyrics in different genres
+
+
+```{r trigrams popularity in genre over time, echo=FALSE}
 #Only care about trigram appearing once in a song
 lyric_trigrams <- dt_lyrics %>%
       unnest_tokens(trigram, stemmedwords, token = "ngrams", n = 3) %>% unique()
@@ -110,9 +118,6 @@ trigram_over_time = most_popular_trigram %>% group_by(genre, trigram, year) %>% 
 
 trigram_over_time = trigram_over_time %>% left_join(genre_year_song_counts, by = c("genre" = "genre", "year" = "year")) %>% mutate(percent_of_songs_in = genre_popular_trigram_count_by_year/genre_year_count * 100)
 
-```
-
-``` {r make plot}
 #Create unique column for graph
 trigram_over_time$genre_w1_w2_w3 = paste(trigram_over_time$genre, trigram_over_time$trigram, sep="_")
 
@@ -132,51 +137,44 @@ trigram_genre_year_data = trigram_genre_year_data %>% filter(year > 2000)
 
 trigram_genre_year_data[is.na(trigram_genre_year_data)] <- 0
 
-ggplot(trigram_genre_year_data, aes(x=year, y=genre_popular_trigram_count_by_year, col=genre_w1_w2_w3)) + 
-  geom_line() +
-  ylab(label="Number of songs in") + 
-  xlab("Year") + 
-  ggtitle("Each Genre's most popular trigram appearances over Time")
-
 ggplot(data = trigram_genre_year_data, 
        mapping = aes(x = year, y = percent_of_songs_in, color = genre_w1_w2_w3)) +
   geom_line() +
   facet_grid(rows = vars(genre_w1_w2_w3), scales = "free_y") +
   xlab("Year") +
-  ylab(label="Percent of songs in") +
-  ggtitle("Each Genre's most popular trigram appearances over Time") + 
+  ylab(label="% of songs in during year") +
+  ggtitle("Each Genre's most popular trigram appearances over time") + 
   theme_bw()
 
 
 ```
 
+For each genre, the trigram that appeared in the most number of songs across the dataset was computed. For each year, the percentage of the genre's songs that the most-popular trigram appeared in was computed. It is notable that most of the popular phrases appear early on and then gain popularity over time before having a dip usually between 2013-2016. The exceptions to this are hip-hop and metal, which seem to be peaking. This is potentially indicative of lyrical similarities between mid 2000s and current lyrics or sentiments. Metal seems to be an outlier case where one phrase was incredibly popular in 2007-2008, though it also corresponds to a decline in total nubmer of songs at the time.
 
 
-``` {r Genre change in sentiment over time}
+#### Genre sentiment over time
+
+
+``` {r Genre change in sentiment over time, echo=FALSE}
+#Create tidy data where row contains one word in a song
 unnested_lyrics <- dt_lyrics %>%
       unnest_tokens(word, lyrics)
 
+#Replace positive and negative with 1, -1
 new_sentiments <- sentiments %>% 
   mutate( sentiment = ifelse(sentiment == "positive", 1, ifelse(sentiment == "negative", -1, 0))) 
 
+#Join with lyrics so can have a measurement of songs sentiment
 song_sentiment <- unnested_lyrics %>% left_join(new_sentiments, by = c("word" = "word"))
-
 song_sentiment[is.na(song_sentiment)] <- 0
 
-
+#Compute average song sentiment which is sum of sentiment of words in song/total words in song
 average_song_sentiment <- song_sentiment %>%
   group_by(song,genre,artist,year) %>% summarize(total_song_sentiment = sum(sentiment), song_lyric_words = n()) %>%   mutate(average_song_sentiment = total_song_sentiment/song_lyric_words) %>% ungroup()
 
+#Compute average genre sentiment by taking sum of average sentiment of songs in genre in year/total number of songs in genre in that year
 average_genre_sentiment_over_time <- average_song_sentiment %>% group_by(genre,year) %>% summarize(total_genre_sentiment = sum(average_song_sentiment), total_genre_songs = n()) %>%
   mutate(average_genre_sentiment = total_genre_sentiment/total_genre_songs) %>% ungroup() %>% filter(year>1999 & genre != "Other" & genre != "Not Available")
-
-
-
-ggplot(average_genre_sentiment_over_time, aes(x=year, y=average_genre_sentiment, col=genre)) + 
-  geom_line() +
-  ylab(label="Average Sentiment per Song") + 
-  xlab("Year") + 
-  ggtitle("Genre Sentiment over Time")
 
 ggplot(data = average_genre_sentiment_over_time, 
        mapping = aes(x = year, y = average_genre_sentiment, color = genre)) +
@@ -186,8 +184,32 @@ ggplot(data = average_genre_sentiment_over_time,
   ylab(label="Average Sentiment per Song") +
   ggtitle("Genre Sentiment over Time") + 
   theme_bw()
-
 ```
 
+
+Most genre's have a fairly stable average sentiment per song over time, which is based on the individual sentiment of words. The exception to this is electronic music, which is pretty consistently dropping in sentiment over time. While metal is consistently the most negative genre, there are a few that tend to be more positive (Country, Jazz, Pop, and R&B). Given that averages can be skewed by outliers, we next want to examine the distribution over time
+
+``` {r joy plots, echo=FALSE}
+
+#CREATE JOY PLOT AND POINT OUT SPECIFIC EXAMPLE
+
+ridge_plot = average_song_sentiment %>% filter(year>1999 & genre != "Other" & genre != "Not Available")
+
+ggplot(ridge_plot, aes(y=as.factor(year),
+                      x=average_song_sentiment,
+                      fill=genre)) +
+  geom_density_ridges(alpha=0.25) +
+  scale_y_discrete(expand = c(0.01, 0)) +  
+  scale_x_continuous(expand = c(-.5, .5))
+
+ggplot(ridge_plot, mapping = aes(y=as.factor(year),
+                      x=average_song_sentiment)) +
+  geom_density_ridges(alpha=0.25) +
+    facet_grid(rows = vars(genre)) +
+
+  scale_y_discrete(expand = c(0.01, 0)) +  
+  scale_x_continuous(expand = c(-.5, .5))
+
+```
 
 
