@@ -204,4 +204,4 @@ ggplot(ridge_plot, mapping = aes(y=as.factor(year),
   
   
 We observe some interesting results for a few of the genres. We notice that electronic music has been pretty consistent over time, but early on was skewed to be more positive by a few outliers. Metal music used to have several peaks in the early 2000s, including some songs that were positive, but over time this has shifted and now most songs are negative. Pop music experiences a similar trend where over time it appears that the sentiment of those types of songs has become extremely concentrated to be ever so slightly positive. 
-
+<br/><br/>
