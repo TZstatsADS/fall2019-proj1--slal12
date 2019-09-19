@@ -146,7 +146,7 @@ ggplot(data = trigram_genre_year_data,
 
 ```
   
-For each genre, the trigram that appeared in the most number of songs across the dataset was computed. For each year, the percentage of the genre's songs that the most-popular trigram appeared in was computed. It is notable that most of the popular phrases appear early on and then gain popularity over time before having a dip usually between 2013-2016. The exceptions to this are hip-hop and metal, which seem to be peaking at the end of the dataset. This is potentially indicative of lyrical similarities between mid 2000s and current lyrics or sentiments. Metal seems to be an outlier case where one phrase was incredibly popular in 2007-2008, though it also corresponds to a decline in total nubmer of songs at the time.  
+For each genre, the trigram that appeared in the most number of songs across the dataset was computed. For each year, the percentage of the genre's songs that the most-popular trigram appeared in was computed. It is notable that most of the popular phrases appear early on and then gain popularity over time before having a dip usually between 2013-2016. The exceptions to this are hip-hop and rock, which seem to be peaking at the end of the dataset. This is potentially indicative of lyrical similarities between mid 2000s and current lyrics or sentiments. Metal seems to be an outlier case where one phrase was incredibly popular in 2007-2008, though it also corresponds to a decline in total number of songs at the time.  
 
 <br/><br/>
 
