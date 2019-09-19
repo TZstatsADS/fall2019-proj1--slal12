@@ -61,7 +61,7 @@ ggplot(data = genre_year_song_counts,
   theme_bw()
 ```
 
-Most genre's appear to have their maximal output of songs in 2006 with rock achieveing a peak output of 25k songs. A few genre's have a peak output in 2007. This includes country, indie, and metal. It is notable that almost all genres produce significantly more songs between 2005-2008 before receding to consistently fewer songs, suggesting the dataset aggregated music from a specific time. Note the y-axis is different across plots, due to certain genres such as Indie and R&B producing significantly less music.    
+Most genre's appear to have their maximal output of songs in 2006 with rock achieving a peak output of 25k songs. A few genre's have a peak output in 2007. This includes country, indie, and metal. It is notable that almost all genres produce significantly more songs between 2005-2008 before receding to consistently fewer songs, suggesting the dataset aggregated music from a specific time. Note the y-axis is different across plots, due to certain genres such as Indie and R&B producing significantly less music.    
 
 <br/><br/>
     
